@@ -15,15 +15,15 @@
 // *****************************************************************************
 
 import * as React from '@theia/core/shared/react';
-import { CancellationTokenSource, Emitter, Event } from '@theia/core';
+import { CancellationTokenSource, Emitter, Event, nls } from '@theia/core';
 import { DebugProtocol } from '@vscode/debugprotocol/lib/debugProtocol';
 import { TreeElement } from '@theia/core/lib/browser/source-tree';
 import { DebugStackFrame } from './debug-stack-frame';
 import { DebugSession } from '../debug-session';
 
 export type StoppedDetails = DebugProtocol.StoppedEvent['body'] & {
-    framesErrorMessage?: string
-    totalFrames?: number
+    framesErrorMessage?: string;
+    totalFrames?: number;
 };
 
 export class DebugThreadData {
@@ -32,23 +32,22 @@ export class DebugThreadData {
 }
 
 export interface DebugExceptionInfo {
-    id?: string
-    description?: string
-    details?: DebugProtocol.ExceptionDetails
+    id?: string;
+    description?: string;
+    details?: DebugProtocol.ExceptionDetails;
 }
 
 export class DebugThread extends DebugThreadData implements TreeElement {
-
     protected readonly onDidChangedEmitter = new Emitter<void>();
     readonly onDidChanged: Event<void> = this.onDidChangedEmitter.event;
-    protected readonly onDidFocusStackFrameEmitter = new Emitter<DebugStackFrame | undefined>();
+    protected readonly onDidFocusStackFrameEmitter = new Emitter<
+        DebugStackFrame | undefined
+    >();
     get onDidFocusStackFrame(): Event<DebugStackFrame | undefined> {
         return this.onDidFocusStackFrameEmitter.event;
     }
 
-    constructor(
-        readonly session: DebugSession
-    ) {
+    constructor(readonly session: DebugSession) {
         super();
     }
 
@@ -80,7 +79,7 @@ export class DebugThread extends DebugThreadData implements TreeElement {
     clear(): void {
         this.update({
             raw: this.raw,
-            stoppedDetails: undefined
+            stoppedDetails: undefined,
         });
     }
 
@@ -107,15 +106,18 @@ export class DebugThread extends DebugThreadData implements TreeElement {
     async getExceptionInfo(): Promise<DebugExceptionInfo | undefined> {
         if (this.stoppedDetails && this.stoppedDetails.reason === 'exception') {
             if (this.session.capabilities.supportsExceptionInfoRequest) {
-                const response = await this.session.sendRequest('exceptionInfo', this.toArgs());
+                const response = await this.session.sendRequest(
+                    'exceptionInfo',
+                    this.toArgs()
+                );
                 return {
                     id: response.body.exceptionId,
                     description: response.body.description,
-                    details: response.body.details
+                    details: response.body.details,
                 };
             }
             return {
-                description: this.stoppedDetails.text
+                description: this.stoppedDetails.text,
             };
         }
         return undefined;
@@ -128,7 +130,7 @@ export class DebugThread extends DebugThreadData implements TreeElement {
     async terminate(): Promise<void> {
         if (this.supportsTerminate) {
             await this.session.sendRequest('terminateThreads', {
-                threadIds: [this.raw.id]
+                threadIds: [this.raw.id],
             });
         }
     }
@@ -151,7 +153,7 @@ export class DebugThread extends DebugThreadData implements TreeElement {
         const cancel = this.pendingFetchCancel.token;
         this._pendingFetchCount += 1;
 
-        return this.pendingFetch = this.pendingFetch.then(async () => {
+        return (this.pendingFetch = this.pendingFetch.then(async () => {
             try {
                 const start = this.frameCount;
                 const frames = await this.doFetchFrames(start, levels);
@@ -167,15 +169,22 @@ export class DebugThread extends DebugThreadData implements TreeElement {
                     this._pendingFetchCount -= 1;
                 }
             }
-        });
+        }));
     }
     get pendingFrameCount(): number {
         return this._pendingFetchCount;
     }
-    protected async doFetchFrames(startFrame: number, levels: number): Promise<DebugProtocol.StackFrame[]> {
+    protected async doFetchFrames(
+        startFrame: number,
+        levels: number
+    ): Promise<DebugProtocol.StackFrame[]> {
         try {
-            const response = await this.session.sendRequest('stackTrace',
-                this.toArgs<Partial<DebugProtocol.StackTraceArguments>>({ startFrame, levels })
+            const response = await this.session.sendRequest(
+                'stackTrace',
+                this.toArgs<Partial<DebugProtocol.StackTraceArguments>>({
+                    startFrame,
+                    levels,
+                })
             );
             if (this.stoppedDetails) {
                 this.stoppedDetails.totalFrames = response.body.totalFrames;
@@ -188,11 +197,14 @@ export class DebugThread extends DebugThreadData implements TreeElement {
             return [];
         }
     }
-    protected doUpdateFrames(frames: DebugProtocol.StackFrame[]): DebugStackFrame[] {
+    protected doUpdateFrames(
+        frames: DebugProtocol.StackFrame[]
+    ): DebugStackFrame[] {
         const result = new Set<DebugStackFrame>();
         for (const raw of frames) {
             const id = raw.id;
-            const frame = this._frames.get(id) || new DebugStackFrame(this, this.session);
+            const frame =
+                this._frames.get(id) || new DebugStackFrame(this, this.session);
             this._frames.set(id, frame);
             frame.update({ raw });
             result.add(frame);
@@ -217,24 +229,56 @@ export class DebugThread extends DebugThreadData implements TreeElement {
     protected updateCurrentFrame(): void {
         const { currentFrame } = this;
         const frameId = currentFrame && currentFrame.raw.id;
-        this.currentFrame = typeof frameId === 'number' &&
-            this._frames.get(frameId) ||
+        this.currentFrame =
+            (typeof frameId === 'number' && this._frames.get(frameId)) ||
             this._frames.values().next().value;
     }
 
     protected toArgs<T extends object>(arg?: T): { threadId: number } & T {
         return Object.assign({}, arg, {
-            threadId: this.raw.id
+            threadId: this.raw.id,
         });
     }
 
     render(): React.ReactNode {
         const reason = this.stoppedDetails && this.stoppedDetails.reason;
-        const status = this.stoppedDetails ? reason ? `Paused on ${reason}` : 'Paused' : 'Running';
-        return <div className='theia-debug-thread' title='Thread'>
-            <span className='label'>{this.raw.name}</span>
-            <span className='status'>{status}</span>
-        </div>;
+        const localizedReason = this.getlocalizedReason(reason);
+
+        const status = this.stoppedDetails
+            ? reason
+                ? nls.localizeByDefault('Paused on {0}', localizedReason)
+                : nls.localizeByDefault('Paused')
+            : nls.localizeByDefault('Running');
+        return (
+            <div className="theia-debug-thread" title="Thread">
+                <span className="label">{this.raw.name}</span>
+                <span className="status">{status}</span>
+            </div>
+        );
     }
 
+    private getlocalizedReason(reason: string | undefined): string{
+        switch (reason) {
+            case 'step':
+                return nls.localize('theia/debug/step', 'step');
+            case 'breakpoint':
+                return nls.localize('theia/debug/breakpoint', 'breakpoint');
+            case 'breakpoint':
+                return nls.localize('theia/debug/exception', 'exception');
+            case 'breakpoint':
+                return nls.localize('theia/debug/pause', 'pause');
+            case 'breakpoint':
+                return nls.localize('theia/debug/entry', 'entry');
+            case 'breakpoint':
+                return nls.localize('theia/debug/goto', 'goto');
+            case 'breakpoint':
+                return nls.localize('theia/debug/function breakpoint', 'function breakpoint');
+             case 'breakpoint':
+                return nls.localize('theia/debug/data breakpoint', 'data breakpoint');
+            case 'breakpoint':
+                return nls.localize('theia/debug/instruction breakpoint', 'instruction breakpoint');
+            default:
+                return '';
+        }
+    }
 }
