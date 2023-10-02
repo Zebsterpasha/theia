@@ -1,5 +1,5 @@
 // *****************************************************************************
-// Copyright (C) 2018 Ericsson and others.
+// Copyright (C) 2022 TypeFox and others.
 //
 // This program and the accompanying materials are made available under the
 // terms of the Eclipse Public License v. 2.0 which is available at
@@ -14,23 +14,12 @@
 // SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-only WITH Classpath-exception-2.0
 // *****************************************************************************
 
-import { injectable, inject } from '@theia/core/shared/inversify';
-import { KeybindingContext, ApplicationShell } from '@theia/core/lib/browser';
-import { FileNavigatorWidget } from './navigator-widget';
-
-export namespace NavigatorKeybindingContexts {
-    export const navigatorActive = 'navigatorActive';
-}
+import { injectable } from 'inversify';
+import { OS, OSBackendProvider } from '../common/os';
 
 @injectable()
-export class NavigatorActiveContext implements KeybindingContext {
-
-    readonly id: string = NavigatorKeybindingContexts.navigatorActive;
-
-    @inject(ApplicationShell)
-    protected readonly applicationShell: ApplicationShell;
-
-    isEnabled(): boolean {
-        return this.applicationShell.activeWidget instanceof FileNavigatorWidget;
+export class OSBackendProviderImpl implements OSBackendProvider {
+    getBackendOS(): Promise<OS.Type> {
+        return Promise.resolve(OS.type());
     }
 }

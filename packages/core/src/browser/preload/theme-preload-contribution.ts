@@ -1,5 +1,5 @@
 // *****************************************************************************
-// Copyright (C) 2022 TypeFox and others.
+// Copyright (C) 2023 TypeFox and others.
 //
 // This program and the accompanying materials are made available under the
 // terms of the Eclipse Public License v. 2.0 which is available at
@@ -14,17 +14,18 @@
 // SPDX-License-Identifier: EPL-2.0 OR GPL-2.0-only WITH Classpath-exception-2.0
 // *****************************************************************************
 
-import * as express from 'express';
+import { PreloadContribution } from './preloader';
+import { DEFAULT_BACKGROUND_COLOR_STORAGE_KEY } from '../frontend-application-config-provider';
 import { injectable } from 'inversify';
-import { BackendApplicationContribution } from './backend-application';
-import { OS } from '../common/os';
+import { DefaultTheme } from '@theia/application-package/lib/application-props';
 
 @injectable()
-export class OSBackendApplicationContribution implements BackendApplicationContribution {
+export class ThemePreloadContribution implements PreloadContribution {
 
-    configure(app: express.Application): void {
-        app.get('/os', (_, res) => {
-            res.send(OS.type());
-        });
+    initialize(): void {
+        const dark = window.matchMedia?.('(prefers-color-scheme: dark)').matches;
+        const value = window.localStorage.getItem(DEFAULT_BACKGROUND_COLOR_STORAGE_KEY) || DefaultTheme.defaultBackgroundColor(dark);
+        document.documentElement.style.setProperty('--theia-editor-background', value);
     }
+
 }
